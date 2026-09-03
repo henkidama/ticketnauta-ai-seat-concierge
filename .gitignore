@@ -17,8 +17,8 @@ TestResults/
 .DS_Store
 Thumbs.db
 
-# Runtime data
-data/
+# Runtime data (root-level only; do not hide the C# Data/ source folder on Windows)
+/data/
 *.log
 
 # Local analysis artifacts
