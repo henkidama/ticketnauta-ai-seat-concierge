@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Ticketnauta AI Seat Concierge, an isolated WebMCP demo with fictional events and seats.">
   <title>Ticketnauta AI Seat Concierge · WebMCP Demo</title>
-  <link rel="stylesheet" href="/styles.css?v=3">
+  <link rel="stylesheet" href="/styles.css?v=4">
 </head>
 <body>
   <div class="page-glow page-glow-a" aria-hidden="true"></div>
@@ -124,6 +124,26 @@
           <span class="button-spark" aria-hidden="true">✦</span>
           Find with AI
         </button>
+
+        <div class="constraint-strip" role="group" aria-label="Real-world seat constraints">
+          <span class="constraint-title">REAL-WORLD CONSTRAINTS</span>
+          <label class="constraint-toggle">
+            <input id="prefer-aisle" type="checkbox">
+            <span><b>Aisle-friendly</b><small>Prefer row edges</small></span>
+          </label>
+          <label class="constraint-toggle">
+            <input id="accessible-pair" type="checkbox">
+            <span><b>Accessible + companion</b><small>Keep the pair together</small></span>
+          </label>
+          <label class="constraint-toggle">
+            <input id="allow-split-pairs" type="checkbox">
+            <span><b>Allow 2 + 2 fallback</b><small>Only if four together fail</small></span>
+          </label>
+          <label class="constraint-toggle">
+            <input id="avoid-orphan-seats" type="checkbox" checked>
+            <span><b>Avoid orphan seats</b><small>Protect usable inventory</small></span>
+          </label>
+        </div>
       </form>
 
       <article class="map-card panel">
@@ -148,13 +168,39 @@
         </div>
 
         <div class="map-footer">
-          <p><span aria-hidden="true">♿</span> Accessible seats display an additional ring.</p>
+          <p><span aria-hidden="true">♿</span> Accessible positions have a ring; their adjacent standard seat is the companion position.</p>
           <p id="map-availability">— seats available</p>
         </div>
       </article>
     </section>
 
     <aside class="concierge-rail" aria-label="AI concierge, recommendations, and cart">
+      <article class="judge-card panel">
+        <div class="judge-heading">
+          <div>
+            <p class="eyebrow">JUDGE MODE · REAL-WORLD FAILURE</p>
+            <h2>Live Seat Rescue</h2>
+          </div>
+          <span class="judge-badge">90 SEC</span>
+        </div>
+        <p class="judge-intro">Show how an agent recovers when another buyer takes a recommended seat before the hold is confirmed.</p>
+        <ol class="judge-steps" aria-label="Live Seat Rescue steps">
+          <li><span>1</span>Load a constrained group request</li>
+          <li><span>2</span>Let another buyer change availability</li>
+          <li><span>3</span>Ask the agent to recover and request approval again</li>
+        </ol>
+        <div class="judge-prompt">
+          <p id="judge-agent-prompt">Find four Gold seats under MXN 8,000, centered and aisle-friendly. Highlight the best option, explain the score, and ask before selecting or holding. If availability changes, recover with the next best option.</p>
+          <button id="copy-judge-prompt" type="button">Copy agent prompt</button>
+        </div>
+        <div class="judge-actions">
+          <button id="load-judge-scenario" class="primary-button" type="button">Load scenario</button>
+          <button id="simulate-competitor" class="danger-demo-button" type="button" disabled>Simulate competing buyer</button>
+          <button id="reset-judge-scenario" class="text-button" type="button">Reset my demo</button>
+        </div>
+        <p id="judge-status" class="judge-status" aria-live="polite"><i></i><span>Ready to load a clean scenario.</span></p>
+      </article>
+
       <article class="conversation-card panel">
         <div class="card-heading conversation-heading">
           <div>
@@ -175,8 +221,8 @@
         </div>
 
         <div class="prompt-chips" aria-label="Suggested concierge requests">
-          <button type="button" data-concierge-prompt="Find 4 seats under MX$7,000 and hold the best option" disabled>4 seats + hold</button>
-          <button type="button" data-concierge-prompt="Show me 2 accessible seats" disabled>Accessible pair</button>
+          <button type="button" data-concierge-prompt="Find 4 Gold seats under MXN 8,000, centered and aisle-friendly" disabled>Judge scenario</button>
+          <button type="button" data-concierge-prompt="Show me an accessible seat with a companion seat" disabled>Accessible + companion</button>
           <button type="button" data-concierge-prompt="Find the closest Gold seats for 3 guests" disabled>Closest Gold</button>
         </div>
 
@@ -200,7 +246,7 @@
         <div id="options-empty" class="empty-state">
           <span class="empty-spark" aria-hidden="true">✦</span>
           <strong>Your concierge is ready</strong>
-          <p>Set guest count, budget, and priority to find contiguous seat blocks.</p>
+          <p>Set the group, total budget, and real-world constraints to compare explainable seat options.</p>
         </div>
         <div id="seat-options" class="seat-options" aria-live="polite"></div>
       </article>
@@ -246,6 +292,6 @@
     <form method="dialog"><button class="primary-button" value="close">Back to the map</button></form>
   </dialog>
 
-  <script type="module" src="/app.js?v=4"></script>
+  <script type="module" src="/app.js?v=5"></script>
 </body>
 </html>

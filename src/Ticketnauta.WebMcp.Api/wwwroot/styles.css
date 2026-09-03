@@ -1659,6 +1659,282 @@ h2 {
   width: 100%;
 }
 
+/* Real-world constraints and the self-guided judging scenario. */
+.constraint-strip {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: auto repeat(4, minmax(135px, 1fr));
+  gap: 8px;
+  align-items: center;
+  padding-top: 11px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.constraint-title {
+  color: #7f88a7;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+}
+
+.constraint-toggle {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 38px;
+  padding: 6px 8px;
+  border: 1px solid rgba(157, 123, 255, 0.12);
+  border-radius: 9px;
+  background: rgba(157, 123, 255, 0.035);
+  cursor: pointer;
+}
+
+.constraint-toggle:has(input:checked) {
+  border-color: rgba(54, 221, 189, 0.25);
+  background: rgba(54, 221, 189, 0.055);
+}
+
+.constraint-toggle input {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--teal);
+}
+
+.constraint-toggle span,
+.constraint-toggle b,
+.constraint-toggle small {
+  display: block;
+  min-width: 0;
+}
+
+.constraint-toggle b {
+  color: #c9cede;
+  font-size: 8px;
+}
+
+.constraint-toggle small {
+  margin-top: 2px;
+  color: #6f7897;
+  font-size: 6px;
+}
+
+.judge-card {
+  position: relative;
+  overflow: hidden;
+  padding: 17px;
+  border-color: rgba(255, 152, 103, 0.24);
+  background:
+    radial-gradient(circle at 100% 0, rgba(255, 126, 155, 0.12), transparent 13rem),
+    var(--panel);
+}
+
+.judge-card::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, #ff9466, #ff6f91, transparent 88%);
+  content: "";
+}
+
+.judge-heading,
+.judge-actions,
+.judge-status {
+  display: flex;
+  align-items: center;
+}
+
+.judge-heading {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.judge-heading h2 {
+  font-size: 15px;
+}
+
+.judge-badge {
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 148, 102, 0.24);
+  border-radius: 999px;
+  color: #ffae89;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+.judge-intro {
+  margin: 9px 0 10px;
+  color: #929ab5;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.judge-steps {
+  display: grid;
+  gap: 5px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.judge-steps li {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: #a6adc2;
+  font-size: 7px;
+}
+
+.judge-steps li > span {
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(255, 148, 102, 0.1);
+  color: #ffb28f;
+  font-weight: 900;
+}
+
+.judge-prompt {
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.13);
+}
+
+.judge-prompt p {
+  margin: 0;
+  color: #b9bfd3;
+  font-size: 7px;
+  line-height: 1.48;
+}
+
+.judge-prompt button {
+  margin-top: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9f8cff;
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.judge-actions {
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.judge-actions button {
+  flex: 1 1 110px;
+  min-height: 34px;
+  border-radius: 9px;
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.danger-demo-button {
+  border: 1px solid rgba(255, 126, 155, 0.28);
+  background: rgba(255, 126, 155, 0.09);
+  color: #ff9bb2;
+}
+
+.danger-demo-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.judge-status {
+  gap: 6px;
+  margin: 9px 0 0;
+  color: #808aa8;
+  font-size: 7px;
+  line-height: 1.4;
+}
+
+.judge-status i {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #77809c;
+}
+
+.judge-status.loaded i { background: var(--teal); box-shadow: 0 0 8px rgba(54, 221, 189, 0.65); }
+.judge-status.armed i { background: #ff8fa9; box-shadow: 0 0 8px rgba(255, 126, 155, 0.7); }
+.judge-status.recovered i { background: #a78bfa; box-shadow: 0 0 8px rgba(167, 139, 250, 0.7); }
+
+.tool-detail {
+  flex-basis: 100%;
+  overflow: hidden;
+  color: #697390;
+  font-size: 6px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-kind.visual {
+  background: rgba(111, 180, 255, 0.09);
+  color: #8fc4ff;
+}
+
+.tool-kind.consequential {
+  background: rgba(255, 148, 102, 0.1);
+  color: #ffae89;
+}
+
+.seat-option.invalidated {
+  border-color: rgba(255, 126, 155, 0.28);
+  background: rgba(255, 126, 155, 0.045);
+}
+
+.seat-option.invalidated .option-match {
+  background: rgba(255, 126, 155, 0.12);
+  color: #ff9bb2;
+}
+
+.option-evidence {
+  display: flex;
+  gap: 5px;
+  margin: 8px 0 10px;
+  flex-wrap: wrap;
+}
+
+.evidence-chip {
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #929ab5;
+  font-size: 6px;
+  font-weight: 800;
+}
+
+.evidence-chip.positive {
+  border-color: rgba(54, 221, 189, 0.14);
+  color: #7fdcca;
+}
+
+.evidence-chip.warning {
+  border-color: rgba(255, 148, 102, 0.16);
+  color: #eab08f;
+}
+
+.option-tradeoffs {
+  margin: -2px 0 9px;
+  padding-left: 14px;
+  color: #8e96b0;
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.option-match-score {
+  color: #ddd6ff;
+  font-weight: 900;
+}
+
 @media (max-width: 1280px) {
   .app-shell {
     grid-template-columns: 220px minmax(520px, 1fr) 290px;
@@ -1669,6 +1945,14 @@ h2 {
   }
 
   .preference-copy {
+    grid-column: 1 / -1;
+  }
+
+  .constraint-strip {
+    grid-template-columns: repeat(2, minmax(145px, 1fr));
+  }
+
+  .constraint-title {
     grid-column: 1 / -1;
   }
 
@@ -1691,6 +1975,10 @@ h2 {
   }
 
   .conversation-card {
+    grid-column: 1 / -1;
+  }
+
+  .judge-card {
     grid-column: 1 / -1;
   }
 }
@@ -1769,6 +2057,8 @@ h2 {
 
   .preference-copy,
   .find-button,
+  .constraint-strip,
+  .judge-card,
   .conversation-card,
   .recommendations,
   .cart-card {
@@ -1805,6 +2095,15 @@ h2 {
 
   .preference-copy,
   .find-button {
+    grid-column: auto;
+  }
+
+  .constraint-strip {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .constraint-title {
     grid-column: auto;
   }
 

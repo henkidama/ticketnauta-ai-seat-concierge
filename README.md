@@ -1,6 +1,6 @@
 # Ticketnauta AI Seat Concierge
 
-Ticketnauta AI Seat Concierge is an isolated WebMCP challenge demo where people and browser agents collaborate to discover an event, compare contiguous seat blocks, understand tradeoffs on a visible map, place a temporary hold, and finish a simulated checkout.
+Ticketnauta AI Seat Concierge is an isolated WebMCP challenge demo where people and browser agents collaborate to solve a volatile, multi-constraint ticketing problem. It ranks explainable seat combinations, visualizes them on a shared map, detects when another buyer invalidates a recommendation, safely recovers, places a temporary hold, and finishes a simulated checkout.
 
 **[Try the live HTTPS demo](https://webmcp.ticketnauta.com/)** · **[MIT License](LICENSE)**
 
@@ -11,16 +11,22 @@ The interface works in a standard browser. To let an agent discover and call the
 ## Demo experience
 
 - A responsive interactive SVG seat map with zones, prices, availability, keyboard controls, and accessible-seat markers.
-- Contiguous-seat ranking by guest count, total budget, preferred zone, and priority.
-- Alternatives that remain visible while the best option is highlighted on the map.
+- Explainable ranking by guest count, total budget, preferred zone, center distance, aisle access, accessibility, and inventory fragmentation.
+- Accessible position plus adjacent companion-seat enforcement.
+- Venue-friendly orphan-seat avoidance and an optional two-pairs-in-adjacent-rows fallback when four together are impossible.
+- Alternatives with a 0–100 fit score, evidence chips, explicit tradeoffs, and synchronized highlights on the map.
+- **Live Seat Rescue:** a repeatable Judge Mode scenario where a simulated competing buyer invalidates a recommendation and the agent receives a structured conflict plus safe recovery instructions.
 - A conversational concierge that understands common English seat requests and visibly traces every guided tool action.
-- Browser-agent WebMCP calls appear in the same conversation timeline with a separate `WEBMCP` source label.
-- Selection, temporary holds with expiration, release, cart summary, and explicitly confirmed simulated checkout.
+- Browser-agent WebMCP calls appear in the same conversation timeline with source, input/result summary, duration, and `READ ONLY`, `VISUAL`, or `CONSEQUENTIAL` classification.
+- Selection, explicitly confirmed temporary holds with expiration, release, cart summary, and explicitly confirmed simulated checkout.
+- One-click session reset for repeatable judging without disturbing seed data or another visitor's session.
 - No external language-model API is required by the page. The built-in conversation is a deterministic guided interface; a compatible browser agent uses the nine registered WebMCP tools directly.
 
 Try this request with a compatible browser agent:
 
-> Find four contiguous seats under MX$7,000, prioritize centered seats, show me the alternatives, and ask before holding the best option.
+> Find four Gold seats under MXN 8,000, centered and aisle-friendly. Highlight the best option, explain the score, and ask before selecting or holding. If availability changes, recover with the next best option.
+
+For the strongest demonstration, click **Load scenario**, let the agent find and highlight the option, then click **Simulate competing buyer** before approving it. The stale selection will fail with `seat_conflict`; the response tells the agent to refresh, explain a replacement, and obtain renewed human approval.
 
 ## Architecture
 
@@ -54,23 +60,25 @@ The main document registers these tools with `document.modelContext.registerTool
 |---|---|---|
 | `search_events` | Read-only | Search fictional events |
 | `get_event_details` | Read-only | Read zones, prices, and availability |
-| `find_seat_options` | Read-only | Rank contiguous seat blocks |
+| `find_seat_options` | Read-only | Rank explainable contiguous options and an explicitly enabled 2 + 2 fallback |
 | `highlight_seats` | Page action | Highlight seats on the visible map |
 | `select_seat_option` | Page action | Replace the demo cart selection |
-| `hold_seats` | Consequential demo action | Create a temporary hold |
+| `hold_seats` | Consequential demo action | Create a temporary hold after explicit `HOLD_SELECTED_SEATS` confirmation |
 | `release_seats` | Consequential demo action | Release the active hold |
 | `get_cart_summary` | Read-only | Read the selection, total, and expiration |
 | `proceed_to_checkout` | Consequential demo action | Finish the simulation after explicit confirmation |
 
-Every tool has a narrow JSON Schema. Object schemas reject undeclared fields with `additionalProperties: false`. Read-only operations and state-changing operations remain separate, and checkout accepts only the explicit `SIMULATE_CHECKOUT` confirmation value.
+Every tool has a narrow JSON Schema. Object schemas reject undeclared fields with `additionalProperties: false`. Read-only operations, visual updates, and state-changing operations remain separate. Holds accept only `HOLD_SELECTED_SEATS`; checkout accepts only `SIMULATE_CHECKOUT`. Structured `seat_conflict` errors include unavailable seat IDs and a recovery directive without performing an unapproved replacement action.
 
 ## Included technology
 
 - .NET 10 and ASP.NET Core Minimal API
 - PostgreSQL with idempotent schema bootstrap and fictional seed data
 - Npgsql data access with transactional event-level locking for holds
+- Structured concurrent-buyer simulation and session-scoped Judge Mode reset
 - Dependency-free HTML, CSS, JavaScript, and SVG frontend
 - Multi-stage Dockerfile and Docker Compose health checks
+- GitHub Actions build, unit-test, WebMCP-contract, Compose, and end-to-end recovery checks
 - Optional Cloudflare Tunnel Compose profile
 - Token-protected reset that deletes only runtime records in `webmcp_demo`
 
@@ -176,9 +184,10 @@ dotnet test .\Ticketnauta.WebMcp.slnx --no-restore -c Release
 npm run check:web
 docker compose config
 docker compose build
+npm run smoke:rescue -- http://localhost:8085
 ```
 
-`npm run check:web` verifies JavaScript syntax and the challenge-facing contract: nine tools, English main page, no iframe, visible conversation, separated sources, and explicit checkout confirmation.
+`npm run check:web` verifies JavaScript syntax and the challenge-facing contract: nine tools, English main page, no iframe, Judge Mode, structured recovery, separated sources, and explicit hold/checkout confirmation. `npm run smoke:rescue` exercises the full database-backed stale-recommendation conflict and replacement-hold flow against a running stack.
 
 Health endpoints:
 
@@ -187,7 +196,9 @@ Health endpoints:
 
 ## Reset the demo
 
-The reset requires `DEMO_ADMIN_TOKEN` from `.env`, an exact confirmation string, and the private header. It preserves seed data and never touches another schema.
+The visible **Reset my demo** action clears only the current browser session, its simulated competitor, and seats sold by that session. It requires no shared secret and preserves other visitors.
+
+The administrative reset below clears all fictional runtime records. It requires `DEMO_ADMIN_TOKEN` from `.env`, an exact confirmation string, and the private header. It preserves seed data and never touches another schema.
 
 ```powershell
 .\scripts\reset-demo.ps1
@@ -231,8 +242,10 @@ Public WebMCP exposure requires HTTPS and a compatible client. Challenge judges 
 - `.env` is ignored by Git and excluded from the Docker build context.
 - JavaScript, settings, Compose, seed data, and documentation contain no credentials.
 - Hold operations use a PostgreSQL advisory lock and verify availability inside the transaction.
+- Stale selections return typed `seat_conflict` details instead of silently replacing seats.
+- The public Judge Mode reset is scoped to its UUID browser session and simulated competitor.
 - Selection and hold creation refuse to replace an active hold; `release_seats` must be called explicitly.
-- `proceed_to_checkout` never calls a payment gateway and requires explicit confirmation.
+- `hold_seats` and `proceed_to_checkout` never call a real service and both require explicit confirmation.
 - The reset endpoint compares its token in constant time.
 - The API sends a Content Security Policy, `Permissions-Policy: tools=(self)`, `frame-ancestors 'none'`, and baseline security headers.
 

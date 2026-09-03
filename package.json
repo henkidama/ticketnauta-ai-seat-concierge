@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check:web": "node --check src/Ticketnauta.WebMcp.Api/wwwroot/app.js && node --check src/Ticketnauta.WebMcp.Api/wwwroot/webmcp.js && node scripts/check-webmcp.mjs"
+    "check:web": "node --check src/Ticketnauta.WebMcp.Api/wwwroot/app.js && node --check src/Ticketnauta.WebMcp.Api/wwwroot/webmcp.js && node scripts/check-webmcp.mjs",
+    "smoke:rescue": "node scripts/smoke-live-rescue.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -1,0 +1,68 @@
+name: Verify demo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_PORT: 8085
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ticketnauta_webmcp_ci
+      DB_USER: webmcp_ci
+      DB_PASSWORD: ci_only_not_a_deployed_secret_2026
+      DB_SSL_MODE: Disable
+      DEMO_ADMIN_TOKEN: ci_only_reset_token_2026
+      HOLD_MINUTES: 2
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Restore
+        run: dotnet restore ./Ticketnauta.WebMcp.slnx --configfile ./NuGet.Config
+
+      - name: Build
+        run: dotnet build ./Ticketnauta.WebMcp.slnx --configuration Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test ./Ticketnauta.WebMcp.slnx --configuration Release --no-build
+
+      - name: Verify the English WebMCP surface
+        run: npm run check:web
+
+      - name: Validate Compose
+        run: docker compose --profile localdb config --quiet
+
+      - name: Start isolated stack
+        run: docker compose --profile localdb up --build --detach --wait
+
+      - name: Exercise Live Seat Rescue
+        run: npm run smoke:rescue -- http://localhost:8085
+
+      - name: Capture container diagnostics
+        if: failure()
+        run: docker compose --profile localdb logs --no-color --tail 200
+
+      - name: Stop isolated stack
+        if: always()
+        run: docker compose --profile localdb down --volumes

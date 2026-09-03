@@ -31,11 +31,18 @@ function toolResult(payload) {
 }
 
 function toolError(error) {
+  const problem = error?.problem ?? {};
   return {
     isError: true,
     content: [{
       type: 'text',
-      text: JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+      text: JSON.stringify({
+        error: error instanceof Error ? error.message : String(error),
+        code: error?.code,
+        status: error?.status,
+        unavailableSeatIds: problem.unavailableSeatIds,
+        recovery: problem.recovery,
+      }),
     }],
   };
 }
@@ -47,10 +54,18 @@ function emitToolActivity(detail) {
 function execute(toolName, action) {
   return async (input = {}, execution = {}) => {
     const callId = createUuid();
+    const startedAt = performance.now();
     emitToolActivity({ callId, phase: 'start', toolName, input });
     try {
       const result = await action(input, execution.signal);
-      emitToolActivity({ callId, phase: 'complete', toolName, input, result });
+      emitToolActivity({
+        callId,
+        phase: 'complete',
+        toolName,
+        input,
+        result,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
       return toolResult(result);
     } catch (error) {
       emitToolActivity({
@@ -59,6 +74,9 @@ function execute(toolName, action) {
         toolName,
         input,
         error: error instanceof Error ? error.message : String(error),
+        code: error?.code,
+        problem: error?.problem,
+        durationMs: Math.round(performance.now() - startedAt),
       });
       return toolError(error);
     }
@@ -126,8 +144,8 @@ export async function registerWebMcpTools(app, onStatus) {
     },
     {
       name: 'find_seat_options',
-      title: 'Find contiguous seat options',
-      description: 'Rank up to five available contiguous seat combinations by quantity, total budget, zone, and priority. This is read-only and does not select or hold seats.',
+      title: 'Find explainable seat options',
+      description: 'Rank up to five available seat combinations by quantity, total budget, zone, priority, accessibility, aisle access, and inventory-friendly placement. Returns score evidence and tradeoffs. A 2+2 split is used only when explicitly allowed and no contiguous block matches. This is read-only.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -159,18 +177,48 @@ export async function registerWebMcpTools(app, onStatus) {
             enum: ['any', 'closest_to_stage', 'center', 'best_value', 'accessible'],
             description: 'Primary criterion for ranking alternatives.',
           },
+          prefer_aisle: {
+            type: 'boolean',
+            description: 'When true, strongly prefer a block that includes seat 1 or the last seat in a row.',
+          },
+          require_accessible_pair: {
+            type: 'boolean',
+            description: 'Require an accessible position plus an adjacent standard companion seat. Quantity must be at least 2.',
+          },
+          allow_split_pairs: {
+            type: 'boolean',
+            description: 'For a group of four only, allow two pairs in adjacent rows if no four-seat contiguous block matches.',
+          },
+          avoid_orphan_seats: {
+            type: 'boolean',
+            description: 'Prefer choices that do not leave one isolated available seat in a row segment. Defaults to true.',
+          },
         },
         required: ['event_id', 'quantity'],
         additionalProperties: false,
       },
       annotations: { readOnlyHint: true, untrustedContentHint: false },
-      execute: execute('find_seat_options', ({ event_id, quantity, max_total_budget, zone_preference, preference }, signal) =>
+      execute: execute('find_seat_options', ({
+        event_id,
+        quantity,
+        max_total_budget,
+        zone_preference,
+        preference,
+        prefer_aisle,
+        require_accessible_pair,
+        allow_split_pairs,
+        avoid_orphan_seats,
+      }, signal) =>
         app.findSeatOptions({
           eventId: event_id,
           quantity,
           maxTotalBudget: max_total_budget,
           zonePreference: zone_preference ?? 'any',
           preference: preference ?? 'center',
+          preferAisle: prefer_aisle ?? false,
+          requireAccessiblePair: require_accessible_pair ?? false,
+          allowSplitPairs: allow_split_pairs ?? false,
+          avoidOrphanSeats: avoid_orphan_seats ?? true,
         }, signal)),
     },
     {
@@ -205,7 +253,7 @@ export async function registerWebMcpTools(app, onStatus) {
     {
       name: 'select_seat_option',
       title: 'Select a seat option',
-      description: 'Replace the current demo cart selection with an option from the most recent search. This does not create or release a hold; release an active hold separately first.',
+      description: 'Replace the current demo cart selection with an option from the most recent search. This does not create or release a hold. If availability changed, call find_seat_options again, explain the replacement, and obtain renewed user approval before selecting it.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -224,10 +272,21 @@ export async function registerWebMcpTools(app, onStatus) {
     {
       name: 'hold_seats',
       title: 'Temporarily hold selected seats',
-      description: 'Create a temporary hold in the demo database for the currently selected seats. This changes availability and expires automatically. An existing hold must be released separately first.',
-      inputSchema: emptyObjectSchema,
+      description: 'Create a temporary hold in the demo database for the currently selected seats, only after explicit user approval. This changes availability and expires automatically. If a seat_conflict is returned, refresh and rank replacements, explain what changed, and ask again before holding a replacement.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          confirmation: {
+            type: 'string',
+            enum: ['HOLD_SELECTED_SEATS'],
+            description: 'Explicit confirmation that the user approved holding the currently selected fictional seats.',
+          },
+        },
+        required: ['confirmation'],
+        additionalProperties: false,
+      },
       annotations: { readOnlyHint: false, untrustedContentHint: false },
-      execute: execute('hold_seats', (_, signal) => app.holdSelectedSeats(signal)),
+      execute: execute('hold_seats', ({ confirmation }, signal) => app.holdSelectedSeats(confirmation, signal)),
     },
     {
       name: 'release_seats',

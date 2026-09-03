@@ -87,6 +87,102 @@ public sealed class SeatOptionFinderTests
             Assert.Contains(option.SeatIds, id => id.EndsWith(":01") || id.EndsWith(":02")));
     }
 
+    [Fact]
+    public void Find_PreferAisleRanksAnAisleBlockFirst()
+    {
+        var candidates = Enumerable.Range(1, 12)
+            .Select(number => Seat("gold", "Gold", "A", number, 900m, 2))
+            .ToArray();
+
+        var result = SeatOptionFinder.Find(
+            "demo",
+            candidates,
+            new FindSeatOptionsRequest(
+                2,
+                null,
+                "any",
+                "center",
+                PreferAisle: true));
+
+        Assert.NotEmpty(result);
+        Assert.True(result[0].ScoreBreakdown.IncludesAisle);
+        Assert.Contains(result[0].SeatLabels, label => label is "A1" or "A12");
+    }
+
+    [Fact]
+    public void Find_AccessiblePairIncludesAStandardCompanionSeat()
+    {
+        var candidates = new[]
+        {
+            Seat("general", "General Admission", "E", 1, 450m, 4, accessible: true),
+            Seat("general", "General Admission", "E", 2, 450m, 4),
+            Seat("general", "General Admission", "E", 5, 450m, 4),
+            Seat("general", "General Admission", "E", 6, 450m, 4),
+        };
+
+        var result = SeatOptionFinder.Find(
+            "demo",
+            candidates,
+            new FindSeatOptionsRequest(
+                2,
+                null,
+                "any",
+                "accessible",
+                RequireAccessiblePair: true));
+
+        var option = Assert.Single(result);
+        Assert.True(option.ScoreBreakdown.IncludesAccessibleCompanion);
+        Assert.Equal(["E1", "E2"], option.SeatLabels);
+    }
+
+    [Fact]
+    public void Find_AvoidOrphanSeatsPenalizesInventoryFragmentation()
+    {
+        var candidates = Enumerable.Range(1, 5)
+            .Select(number => Seat("preferred", "Preferred", "A", number, 700m, 3))
+            .ToArray();
+
+        var result = SeatOptionFinder.Find(
+            "demo",
+            candidates,
+            new FindSeatOptionsRequest(
+                2,
+                null,
+                "any",
+                "center",
+                AvoidOrphanSeats: true));
+
+        Assert.NotEmpty(result);
+        Assert.False(result[0].ScoreBreakdown.LeavesOrphanSeat);
+    }
+
+    [Fact]
+    public void Find_UsesAdjacentSplitPairsOnlyWhenContiguousBlockIsUnavailable()
+    {
+        var candidates = new[]
+        {
+            Seat("gold", "Gold", "A", 1, 900m, 2),
+            Seat("gold", "Gold", "A", 2, 900m, 2),
+            Seat("gold", "Gold", "B", 1, 900m, 2),
+            Seat("gold", "Gold", "B", 2, 900m, 2),
+        };
+
+        var result = SeatOptionFinder.Find(
+            "demo",
+            candidates,
+            new FindSeatOptionsRequest(
+                4,
+                4_000m,
+                "gold",
+                "center",
+                AllowSplitPairs: true));
+
+        var option = Assert.Single(result);
+        Assert.Equal("split_2_plus_2", option.Layout);
+        Assert.Equal(4, option.SeatIds.Count);
+        Assert.Contains("two pairs", option.Reason);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(9)]

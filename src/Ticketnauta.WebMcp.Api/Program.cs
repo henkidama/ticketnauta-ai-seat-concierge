@@ -59,6 +59,26 @@ app.Use(async (context, next) =>
     {
         await next(context);
     }
+    catch (SeatConflictException ex) when (!context.Response.HasStarted)
+    {
+        context.Response.StatusCode = ex.StatusCode;
+        context.Response.ContentType = "application/problem+json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            type = $"https://ticketnauta.demo/problems/{ex.ErrorCode}",
+            title = "seat availability changed",
+            status = ex.StatusCode,
+            detail = ex.Message,
+            code = ex.ErrorCode,
+            unavailableSeatIds = ex.UnavailableSeatIds,
+            recovery = new
+            {
+                nextTool = "find_seat_options",
+                instruction = "Refresh availability, rank replacements, explain what changed, and obtain renewed user approval before selecting or holding a replacement."
+            },
+            traceId = context.TraceIdentifier
+        }, context.RequestAborted);
+    }
     catch (ApiException ex) when (!context.Response.HasStarted)
     {
         context.Response.StatusCode = ex.StatusCode;
@@ -146,8 +166,10 @@ api.MapPost("/events/{eventId}/seat-options", async (
         options,
         count = options.Count,
         message = options.Count == 0
-            ? "No contiguous combination matches those filters. Try a larger budget, fewer seats, or another preference."
-            : $"Found {options.Count} ranked contiguous alternatives."
+            ? "No safe seat combination matches those constraints. Try a larger budget, fewer seats, or explicitly allow a 2 + 2 fallback for a group of four."
+            : options.Any(option => option.Layout == "split_2_plus_2")
+                ? $"Found {options.Count} ranked two-pair fallback alternatives because no four-seat contiguous block matched."
+                : $"Found {options.Count} ranked contiguous alternatives with explainable score evidence."
     });
 });
 
@@ -195,6 +217,29 @@ api.MapPost("/checkout", async (
 {
     var checkout = await repository.CheckoutAsync(request.SessionId, cancellationToken);
     return Results.Ok(checkout);
+});
+
+api.MapPost("/demo/competing-hold", async (
+    SimulateCompetingBuyerRequest request,
+    DemoRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var disruption = await repository.SimulateCompetingBuyerAsync(request, cancellationToken);
+    return Results.Created($"/api/holds/{disruption.HoldId}", disruption);
+});
+
+api.MapPost("/demo/session-reset", async (
+    DemoSessionResetRequest request,
+    DemoRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    await repository.ResetSessionDemoAsync(request.SessionId, cancellationToken);
+    return Results.Ok(new
+    {
+        reset = true,
+        sessionId = request.SessionId,
+        message = "This browser session, its simulated competitor, and their fictional runtime data were reset. Seed data and other sessions were preserved."
+    });
 });
 
 api.MapPost("/demo/reset", async (

@@ -1,4 +1,4 @@
-import { registerWebMcpTools } from './webmcp.js?v=3';
+import { registerWebMcpTools } from './webmcp.js?v=4';
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const money = new Intl.NumberFormat('en-US', {
@@ -46,7 +46,10 @@ const elements = Object.fromEntries([
   'hold-button', 'checkout-button', 'release-button', 'toast-region',
   'receipt-dialog', 'receipt-message', 'receipt-reference', 'receipt-total',
   'conversation-feed', 'concierge-form', 'concierge-input', 'concierge-send',
-  'activity-count',
+  'activity-count', 'prefer-aisle', 'accessible-pair', 'allow-split-pairs',
+  'avoid-orphan-seats', 'judge-agent-prompt', 'copy-judge-prompt',
+  'load-judge-scenario', 'simulate-competitor', 'reset-judge-scenario',
+  'judge-status',
 ].map((id) => [id, document.getElementById(id)]));
 
 const readOnlyTools = new Set([
@@ -54,6 +57,15 @@ const readOnlyTools = new Set([
   'get_event_details',
   'find_seat_options',
   'get_cart_summary',
+]);
+
+const visualTools = new Set(['highlight_seats']);
+const consequentialTools = new Set([
+  'select_seat_option',
+  'hold_seats',
+  'release_seats',
+  'proceed_to_checkout',
+  'simulate_competing_buyer',
 ]);
 
 const state = {
@@ -70,7 +82,23 @@ const state = {
   toolActivityRows: new Map(),
   conciergeReady: false,
   conciergeBusy: false,
+  lastSearch: null,
+  pendingRecoveryOptionId: null,
+  judgeScenario: 'ready',
 };
+
+function traceValue(value, maxLength = 135) {
+  if (value == null) return 'no payload';
+  const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+  return serialized.length > maxLength ? `${serialized.slice(0, maxLength - 1)}…` : serialized;
+}
+
+function toolKind(toolName) {
+  if (readOnlyTools.has(toolName)) return { className: 'read-only', label: 'READ ONLY' };
+  if (visualTools.has(toolName)) return { className: 'visual', label: 'VISUAL' };
+  if (consequentialTools.has(toolName)) return { className: 'consequential', label: 'CONSEQUENTIAL' };
+  return { className: 'action', label: 'DEMO ACTION' };
+}
 
 function updateConciergeControls() {
   const disabled = !state.conciergeReady || state.conciergeBusy;
@@ -108,7 +136,7 @@ function appendConversationMessage(role, message) {
   elements['conversation-feed'].scrollTop = elements['conversation-feed'].scrollHeight;
 }
 
-function renderToolActivity({ callId, toolName, source, phase, error }) {
+function renderToolActivity({ callId, toolName, source, phase, input, result, error, code, durationMs }) {
   if (!callId || !toolName) return;
   let row = state.toolActivityRows.get(callId);
 
@@ -128,10 +156,15 @@ function renderToolActivity({ callId, toolName, source, phase, error }) {
     sourceBadge.textContent = source;
     const name = document.createElement('code');
     name.textContent = toolName;
+    const classification = toolKind(toolName);
     const kind = document.createElement('span');
-    kind.className = `tool-kind ${readOnlyTools.has(toolName) ? 'read-only' : 'action'}`;
-    kind.textContent = readOnlyTools.has(toolName) ? 'READ ONLY' : 'PAGE ACTION';
-    copy.append(sourceBadge, name, kind);
+    kind.className = `tool-kind ${classification.className}`;
+    kind.textContent = classification.label;
+    const detail = document.createElement('span');
+    detail.className = 'tool-detail';
+    detail.dataset.toolDetail = '';
+    detail.textContent = `Input · ${traceValue(input)}`;
+    copy.append(sourceBadge, name, kind, detail);
 
     const status = document.createElement('span');
     status.className = 'tool-status';
@@ -147,7 +180,12 @@ function renderToolActivity({ callId, toolName, source, phase, error }) {
     row.classList.add(phase);
     const status = row.querySelector('[data-tool-status]');
     status.textContent = phase === 'complete' ? 'DONE' : 'ERROR';
-    if (error) row.title = error;
+    const detail = row.querySelector('[data-tool-detail]');
+    const elapsed = Number.isFinite(durationMs) ? `${durationMs} ms · ` : '';
+    detail.textContent = phase === 'complete'
+      ? `${elapsed}Result · ${traceValue(result)}`
+      : `${elapsed}${code ? `${code} · ` : ''}${error || 'Tool call failed'}`;
+    row.title = phase === 'complete' ? traceValue(result, 900) : (error || 'Tool call failed');
     state.activityCount += 1;
     elements['activity-count'].textContent = String(state.activityCount);
     state.toolActivityRows.delete(callId);
@@ -158,7 +196,8 @@ function renderToolActivity({ callId, toolName, source, phase, error }) {
 
 function optionSummary(option) {
   if (!option) return 'No matching seat block is available with those preferences.';
-  return `${option.zoneName}, row ${option.row}: ${option.seatLabels.join(', ')} for ${money.format(option.totalPrice)} total. ${option.reason}`;
+  const layout = option.layout === 'split_2_plus_2' ? ' Two-pair fallback.' : '';
+  return `${option.zoneName}, row ${option.row}: ${option.seatLabels.join(', ')} for ${money.format(option.totalPrice)} total, ${option.matchScore}% fit. ${option.reason}${layout}`;
 }
 
 function cartSummary(cart) {
@@ -179,8 +218,8 @@ function summarizeToolResult(toolName, result) {
     case 'find_seat_options': {
       const options = result?.options ?? [];
       return options.length
-        ? `The browser agent ranked ${options.length} contiguous option${options.length === 1 ? '' : 's'}. Best match: ${optionSummary(options[0])}`
-        : (result?.message || 'No contiguous option matched those preferences.');
+        ? `The browser agent ranked ${options.length} explainable option${options.length === 1 ? '' : 's'}. Best match: ${optionSummary(options[0])}`
+        : (result?.message || 'No seat option matched those constraints.');
     }
     case 'highlight_seats':
       return result?.message || 'The requested seats are highlighted on the visible map.';
@@ -205,17 +244,37 @@ function handleWebMcpActivity(event) {
   renderToolActivity({ ...detail, source: 'WEBMCP' });
   if (detail.phase === 'complete') {
     appendConversationMessage('assistant', summarizeToolResult(detail.toolName, detail.result));
+    if (detail.toolName === 'find_seat_options' && state.judgeScenario === 'armed') {
+      setJudgeStatus('recovered', 'The browser agent refreshed inventory and highlighted a valid replacement.');
+    }
   } else if (detail.phase === 'error') {
-    appendConversationMessage('assistant', `The browser-agent request could not finish: ${detail.error}`);
+    if (detail.code === 'seat_conflict') {
+      setJudgeStatus('armed', 'Conflict detected. The agent should refresh, explain a replacement, and ask again.');
+      appendConversationMessage(
+        'assistant',
+        'Live conflict detected: another buyer took part of the stale recommendation. The agent received structured recovery instructions and should now refresh alternatives before requesting renewed approval.',
+      );
+    } else {
+      appendConversationMessage('assistant', `The browser-agent request could not finish: ${detail.error}`);
+    }
   }
 }
 
 async function runGuidedTool(toolName, input, action) {
   const callId = createUuid();
-  renderToolActivity({ callId, toolName, source: 'GUIDED', phase: 'start' });
+  const startedAt = performance.now();
+  renderToolActivity({ callId, toolName, source: 'GUIDED', phase: 'start', input });
   try {
     const result = await action();
-    renderToolActivity({ callId, toolName, source: 'GUIDED', phase: 'complete' });
+    renderToolActivity({
+      callId,
+      toolName,
+      source: 'GUIDED',
+      phase: 'complete',
+      input,
+      result,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     return result;
   } catch (error) {
     renderToolActivity({
@@ -224,6 +283,8 @@ async function runGuidedTool(toolName, input, action) {
       source: 'GUIDED',
       phase: 'error',
       error: error instanceof Error ? error.message : String(error),
+      code: error?.code,
+      durationMs: Math.round(performance.now() - startedAt),
     });
     throw error;
   }
@@ -257,6 +318,15 @@ function parseConciergeRequest(request) {
   else if (/best\s+value|value|cheapest|lowest\s+price/.test(normalized)) preference = 'best_value';
   else if (/any\s+(?:seat|priority)|no\s+preference/.test(normalized)) preference = 'any';
 
+  const preferAisle = /aisle|row edge/.test(normalized) || elements['prefer-aisle'].checked;
+  const requireAccessiblePair = preference === 'accessible'
+    || /accessible.*companion|wheelchair.*companion/.test(normalized)
+    || elements['accessible-pair'].checked;
+  const allowSplitPairs = /(?:2\s*\+\s*2)|split\s+(?:pair|group)|two pairs/.test(normalized)
+    || elements['allow-split-pairs'].checked;
+  const avoidOrphanSeats = !/allow\s+orphan/.test(normalized)
+    && elements['avoid-orphan-seats'].checked;
+
   return {
     normalized,
     quantity,
@@ -265,6 +335,10 @@ function parseConciergeRequest(request) {
       : (Number.isFinite(currentBudget) && currentBudget > 0 ? currentBudget : null),
     zonePreference,
     preference,
+    preferAisle,
+    requireAccessiblePair,
+    allowSplitPairs,
+    avoidOrphanSeats,
   };
 }
 
@@ -273,10 +347,71 @@ function syncPreferenceControls(preferences) {
   if (preferences.maxTotalBudget) elements['seat-budget'].value = String(preferences.maxTotalBudget);
   elements['zone-preference'].value = preferences.zonePreference;
   elements['seat-priority'].value = preferences.preference;
+  elements['prefer-aisle'].checked = Boolean(preferences.preferAisle);
+  elements['accessible-pair'].checked = Boolean(preferences.requireAccessiblePair);
+  elements['allow-split-pairs'].checked = Boolean(preferences.allowSplitPairs);
+  elements['avoid-orphan-seats'].checked = preferences.avoidOrphanSeats !== false;
 }
 
 function optionAt(index) {
   return [...state.options.values()][index - 1];
+}
+
+function setJudgeStatus(status, message) {
+  state.judgeScenario = status;
+  elements['judge-status'].className = `judge-status ${status}`;
+  elements['judge-status'].querySelector('span').textContent = message;
+}
+
+function searchInputFromControls() {
+  const budgetValue = elements['seat-budget'].value.trim();
+  return {
+    eventId: state.details?.event.id,
+    quantity: Number(elements['seat-quantity'].value),
+    maxTotalBudget: budgetValue ? Number(budgetValue) : null,
+    zonePreference: elements['zone-preference'].value,
+    preference: elements['seat-priority'].value,
+    preferAisle: elements['prefer-aisle'].checked,
+    requireAccessiblePair: elements['accessible-pair'].checked,
+    allowSplitPairs: elements['allow-split-pairs'].checked,
+    avoidOrphanSeats: elements['avoid-orphan-seats'].checked,
+  };
+}
+
+async function recoverFromSeatConflict(error) {
+  const eventId = state.cart?.eventId || state.details?.event.id;
+  const search = state.lastSearch || searchInputFromControls();
+  await getEventDetails(eventId, undefined, { keepOptions: false });
+  const result = await runGuidedTool(
+    'find_seat_options',
+    {
+      event_id: eventId,
+      quantity: search.quantity,
+      max_total_budget: search.maxTotalBudget,
+      zone_preference: search.zonePreference,
+      preference: search.preference,
+      prefer_aisle: search.preferAisle,
+      require_accessible_pair: search.requireAccessiblePair,
+      allow_split_pairs: search.allowSplitPairs,
+      avoid_orphan_seats: search.avoidOrphanSeats,
+    },
+    () => findSeatOptions({ ...search, eventId }),
+  );
+  const replacement = result.options[0];
+  if (!replacement) {
+    appendConversationMessage(
+      'assistant',
+      `Availability changed${error?.problem?.unavailableSeatIds?.length ? ` for ${error.problem.unavailableSeatIds.length} seat` : ''}, and no safe replacement matches the original constraints. I did not change the cart or create a hold.`,
+    );
+    return;
+  }
+
+  state.pendingRecoveryOptionId = replacement.optionId;
+  setJudgeStatus('recovered', 'A fresh replacement is highlighted; renewed human approval is required.');
+  appendConversationMessage(
+    'assistant',
+    `Another buyer changed availability, so I refreshed the live map and ranked a replacement. ${optionSummary(replacement)} I have not selected or held it. Type “Confirm replacement hold” to approve the new option.`,
+  );
 }
 
 async function handleConciergeRequest(request) {
@@ -295,6 +430,40 @@ async function handleConciergeRequest(request) {
     if (/\b(?:release|cancel)\b.*\bhold\b|\brelease\s+(?:my\s+)?seats\b/.test(normalized)) {
       const cart = await runGuidedTool('release_seats', {}, () => releaseSeats());
       appendConversationMessage('assistant', `Your hold is released. ${cartSummary(cart)}`);
+      return;
+    }
+
+    if (/\bconfirm replacement hold\b/.test(normalized)) {
+      const option = state.options.get(state.pendingRecoveryOptionId);
+      if (!option) throw new Error('There is no pending replacement. Run a fresh seat search first.');
+      await runGuidedTool(
+        'select_seat_option',
+        { option_id: option.optionId },
+        () => selectSeatOption(option.optionId),
+      );
+      const cart = await runGuidedTool(
+        'hold_seats',
+        { confirmation: 'HOLD_SELECTED_SEATS' },
+        () => holdSelectedSeats('HOLD_SELECTED_SEATS'),
+      );
+      state.pendingRecoveryOptionId = null;
+      setJudgeStatus('recovered', 'Replacement approved and safely held after recovery.');
+      appendConversationMessage('assistant', `Replacement approved and held. ${optionSummary(option)} ${cartSummary(cart)}`);
+      return;
+    }
+
+    if (/\bhold\b.*\b(?:selected|current|these)\b|\bhold (?:them|it)\b/.test(normalized)) {
+      try {
+        const cart = await runGuidedTool(
+          'hold_seats',
+          { confirmation: 'HOLD_SELECTED_SEATS' },
+          () => holdSelectedSeats('HOLD_SELECTED_SEATS'),
+        );
+        appendConversationMessage('assistant', `The selected seats are now held. ${cartSummary(cart)}`);
+      } catch (error) {
+        if (error?.code !== 'seat_conflict') throw error;
+        await recoverFromSeatConflict(error);
+      }
       return;
     }
 
@@ -338,12 +507,17 @@ async function handleConciergeRequest(request) {
     if (optionMatch && /\b(?:select|choose|add)\b/.test(normalized)) {
       const option = optionAt(Number(optionMatch[1]));
       if (!option) throw new Error('Run a seat search first, then ask me to select one of its options.');
-      const cart = await runGuidedTool(
-        'select_seat_option',
-        { option_id: option.optionId },
-        () => selectSeatOption(option.optionId),
-      );
-      appendConversationMessage('assistant', `Option ${optionMatch[1]} is selected. ${cartSummary(cart)}`);
+      try {
+        const cart = await runGuidedTool(
+          'select_seat_option',
+          { option_id: option.optionId },
+          () => selectSeatOption(option.optionId),
+        );
+        appendConversationMessage('assistant', `Option ${optionMatch[1]} is selected. ${cartSummary(cart)}`);
+      } catch (error) {
+        if (error?.code !== 'seat_conflict') throw error;
+        await recoverFromSeatConflict(error);
+      }
       return;
     }
 
@@ -356,6 +530,10 @@ async function handleConciergeRequest(request) {
         max_total_budget: preferences.maxTotalBudget,
         zone_preference: preferences.zonePreference,
         preference: preferences.preference,
+        prefer_aisle: preferences.preferAisle,
+        require_accessible_pair: preferences.requireAccessiblePair,
+        allow_split_pairs: preferences.allowSplitPairs,
+        avoid_orphan_seats: preferences.avoidOrphanSeats,
       },
       () => findSeatOptions({
         eventId: state.details?.event.id,
@@ -363,6 +541,10 @@ async function handleConciergeRequest(request) {
         maxTotalBudget: preferences.maxTotalBudget,
         zonePreference: preferences.zonePreference,
         preference: preferences.preference,
+        preferAisle: preferences.preferAisle,
+        requireAccessiblePair: preferences.requireAccessiblePair,
+        allowSplitPairs: preferences.allowSplitPairs,
+        avoidOrphanSeats: preferences.avoidOrphanSeats,
       }),
     );
 
@@ -393,7 +575,11 @@ async function handleConciergeRequest(request) {
     }
 
     if (wantsHold) {
-      const cart = await runGuidedTool('hold_seats', {}, () => holdSelectedSeats());
+      const cart = await runGuidedTool(
+        'hold_seats',
+        { confirmation: 'HOLD_SELECTED_SEATS' },
+        () => holdSelectedSeats('HOLD_SELECTED_SEATS'),
+      );
       appendConversationMessage('assistant', `I found and held the best match. ${optionSummary(best)} ${cartSummary(cart)}`);
     } else if (wantsSelection) {
       appendConversationMessage('assistant', `I selected the best match. ${optionSummary(best)} You can hold it when you are ready.`);
@@ -421,6 +607,16 @@ function getOrCreateSessionId() {
   return value;
 }
 
+class DemoApiError extends Error {
+  constructor(message, status, problem = {}) {
+    super(message);
+    this.name = 'DemoApiError';
+    this.status = status;
+    this.code = problem.code || 'http_error';
+    this.problem = problem;
+  }
+}
+
 async function apiFetch(path, { method = 'GET', body, signal } = {}) {
   const response = await fetch(path, {
     method,
@@ -431,13 +627,14 @@ async function apiFetch(path, { method = 'GET', body, signal } = {}) {
 
   if (!response.ok) {
     let message = `The demo returned error ${response.status}.`;
+    let problem = {};
     try {
-      const problem = await response.json();
+      problem = await response.json();
       message = problem.detail || problem.title || message;
     } catch {
       // Preserve the HTTP fallback when the response has no JSON body.
     }
-    throw new Error(message);
+    throw new DemoApiError(message, response.status, problem);
   }
 
   return response.status === 204 ? null : response.json();
@@ -491,14 +688,30 @@ async function findSeatOptions(input, signal) {
       maxTotalBudget: input.maxTotalBudget == null ? null : Number(input.maxTotalBudget),
       zonePreference: input.zonePreference || 'any',
       preference: input.preference || 'center',
+      preferAisle: Boolean(input.preferAisle),
+      requireAccessiblePair: Boolean(input.requireAccessiblePair),
+      allowSplitPairs: Boolean(input.allowSplitPairs),
+      avoidOrphanSeats: input.avoidOrphanSeats !== false,
     },
   });
 
+  state.lastSearch = {
+    eventId,
+    quantity: Number(input.quantity),
+    maxTotalBudget: input.maxTotalBudget == null ? null : Number(input.maxTotalBudget),
+    zonePreference: input.zonePreference || 'any',
+    preference: input.preference || 'center',
+    preferAisle: Boolean(input.preferAisle),
+    requireAccessiblePair: Boolean(input.requireAccessiblePair),
+    allowSplitPairs: Boolean(input.allowSplitPairs),
+    avoidOrphanSeats: input.avoidOrphanSeats !== false,
+  };
   state.options = new Map(result.options.map((option) => [option.optionId, option]));
   state.focusedOptionId = result.options[0]?.optionId ?? null;
   state.highlighted = new Set(result.options[0]?.seatIds ?? []);
   renderOptions();
   renderMap();
+  updateJudgeControls();
   if (result.options.length === 0) showToast(result.message);
   return result;
 }
@@ -552,7 +765,10 @@ async function selectSeatOption(optionId, signal) {
   return state.cart;
 }
 
-async function holdSelectedSeats(signal) {
+async function holdSelectedSeats(confirmation, signal) {
+  if (confirmation !== 'HOLD_SELECTED_SEATS') {
+    throw new Error('Explicit confirmation="HOLD_SELECTED_SEATS" is required before creating a demo hold.');
+  }
   const cart = await getCartSummary(signal);
   if (!cart.eventId || cart.seats.length === 0) {
     throw new Error('Select an option before holding seats.');
@@ -616,6 +832,120 @@ async function proceedToCheckout(confirmation, signal) {
   if (state.details) await getEventDetails(state.details.event.id, signal, { keepOptions: true });
   showReceipt(result);
   return result;
+}
+
+function updateJudgeControls() {
+  const option = state.options.get(state.focusedOptionId) || state.options.values().next().value;
+  const hasActiveHold = state.cart?.hold?.status === 'active';
+  elements['simulate-competitor'].disabled = !option
+    || hasActiveHold
+    || state.judgeScenario === 'armed';
+}
+
+async function resetJudgeScenario({ announce = true } = {}) {
+  await apiFetch('/api/demo/session-reset', {
+    method: 'POST',
+    body: { sessionId: state.sessionId },
+  });
+  state.options.clear();
+  state.highlighted.clear();
+  state.selected.clear();
+  state.focusedOptionId = null;
+  state.pendingRecoveryOptionId = null;
+  state.lastSearch = null;
+  state.expiryRefreshPending = false;
+  await getCartSummary();
+  if (state.details) await getEventDetails(state.details.event.id);
+  renderAll();
+  setJudgeStatus('ready', 'Ready to load a clean scenario.');
+  updateJudgeControls();
+  if (announce) {
+    appendConversationMessage(
+      'assistant',
+      'Your browser session was reset without touching seed data or another visitor’s session.',
+    );
+    showToast('Your demo session was reset.');
+  }
+}
+
+async function loadJudgeScenario() {
+  await resetJudgeScenario({ announce: false });
+  await getEventDetails('neon-desert-2026');
+  const preferences = {
+    eventId: 'neon-desert-2026',
+    quantity: 4,
+    maxTotalBudget: 8_000,
+    zonePreference: 'gold',
+    preference: 'center',
+    preferAisle: true,
+    requireAccessiblePair: false,
+    allowSplitPairs: true,
+    avoidOrphanSeats: true,
+  };
+  syncPreferenceControls(preferences);
+  const result = await runGuidedTool(
+    'find_seat_options',
+    {
+      event_id: preferences.eventId,
+      quantity: preferences.quantity,
+      max_total_budget: preferences.maxTotalBudget,
+      zone_preference: preferences.zonePreference,
+      preference: preferences.preference,
+      prefer_aisle: preferences.preferAisle,
+      require_accessible_pair: preferences.requireAccessiblePair,
+      allow_split_pairs: preferences.allowSplitPairs,
+      avoid_orphan_seats: preferences.avoidOrphanSeats,
+    },
+    () => findSeatOptions(preferences),
+  );
+  if (!result.options.length) throw new Error('The judge scenario could not find an initial option. Reset the demo and try again.');
+  setJudgeStatus('loaded', 'Constraints loaded. The current recommendation is ready for a live availability change.');
+  updateJudgeControls();
+  appendConversationMessage(
+    'assistant',
+    `Judge scenario loaded. ${optionSummary(result.options[0])} Copy the agent prompt, then simulate a competing buyer before approving the option.`,
+  );
+}
+
+async function simulateCompetingBuyer() {
+  const option = state.options.get(state.focusedOptionId) || state.options.values().next().value;
+  if (!option) throw new Error('Load the judge scenario or find seats before simulating another buyer.');
+  const result = await runGuidedTool(
+    'simulate_competing_buyer',
+    { event_id: option.eventId, seat_ids: option.seatIds },
+    () => apiFetch('/api/demo/competing-hold', {
+      method: 'POST',
+      body: {
+        sessionId: state.sessionId,
+        eventId: option.eventId,
+        seatIds: option.seatIds,
+      },
+    }),
+  );
+  await getEventDetails(option.eventId, undefined, { keepOptions: true });
+  state.highlighted = new Set(option.seatIds);
+  renderOptions();
+  renderMap();
+  setJudgeStatus('armed', `${result.seatLabels.join(', ')} was taken by another buyer. The recommendation is now stale.`);
+  updateJudgeControls();
+  appendConversationMessage(
+    'assistant',
+    `${result.message} The old option remains highlighted so the conflict is visible. Ask the browser agent to select or hold it; the structured error will direct a safe recovery.`,
+  );
+  showToast(`${result.seatLabels.join(', ')} is now held by a simulated competing buyer.`, 'error');
+  return result;
+}
+
+async function copyJudgePrompt() {
+  const prompt = elements['judge-agent-prompt'].textContent.trim();
+  try {
+    await navigator.clipboard.writeText(prompt);
+    showToast('Browser-agent prompt copied.');
+  } catch {
+    elements['concierge-input'].value = prompt;
+    elements['concierge-input'].focus();
+    showToast('The prompt was placed in the concierge input for manual copying.');
+  }
 }
 
 async function toggleSeat(seat) {
@@ -854,9 +1184,17 @@ function renderOptions() {
   if (options.length === 0) return;
 
   const zoneColors = new Map(state.details.zones.map((zone) => [zone.code, zone.color]));
+  const seatStatuses = new Map(state.details.seats.map((seat) => [seat.id, seat.status]));
   options.forEach((option, index) => {
     const card = document.createElement('article');
-    card.className = `seat-option${state.focusedOptionId === option.optionId ? ' focused' : ''}`;
+    const invalidatedSeats = option.seatIds.filter((seatId) =>
+      !['available', 'held_by_you'].includes(seatStatuses.get(seatId)));
+    const invalidated = invalidatedSeats.length > 0;
+    card.className = [
+      'seat-option',
+      state.focusedOptionId === option.optionId ? 'focused' : '',
+      invalidated ? 'invalidated' : '',
+    ].filter(Boolean).join(' ');
 
     const top = document.createElement('div');
     top.className = 'option-top';
@@ -867,7 +1205,9 @@ function renderOptions() {
     rank.append(dot, document.createTextNode(`#${index + 1} · ${option.zoneName}, row ${option.row}`));
     const match = document.createElement('span');
     match.className = 'option-match';
-    match.textContent = index === 0 ? 'BEST MATCH' : 'ALTERNATIVE';
+    match.textContent = invalidated
+      ? 'AVAILABILITY CHANGED'
+      : `${option.matchScore}% ${index === 0 ? 'BEST FIT' : 'FIT'}`;
     top.append(rank, match);
 
     const labels = document.createElement('div');
@@ -880,7 +1220,38 @@ function renderOptions() {
 
     const reason = document.createElement('p');
     reason.className = 'option-reason';
-    reason.textContent = option.reason;
+    reason.textContent = invalidated
+      ? `${invalidatedSeats.length} seat${invalidatedSeats.length === 1 ? '' : 's'} changed after this recommendation. Refresh alternatives before selecting.`
+      : option.reason;
+
+    const evidence = document.createElement('div');
+    evidence.className = 'option-evidence';
+    const addEvidence = (text, kind = '') => {
+      const chip = document.createElement('span');
+      chip.className = `evidence-chip ${kind}`.trim();
+      chip.textContent = text;
+      evidence.append(chip);
+    };
+    const breakdown = option.scoreBreakdown ?? {};
+    addEvidence(`Center offset ${breakdown.centerOffset ?? '—'}`);
+    if (breakdown.preferredZoneMatched) addEvidence('Zone matched', 'positive');
+    if (breakdown.includesAisle) addEvidence('Aisle access', 'positive');
+    if (breakdown.includesAccessibleCompanion) addEvidence('Accessible + companion', 'positive');
+    if (!breakdown.leavesOrphanSeat) addEvidence('No orphan seat', 'positive');
+    else addEvidence('Leaves orphan seat', 'warning');
+    if (option.layout === 'split_2_plus_2') addEvidence('2 + 2 fallback', 'warning');
+    if (breakdown.budgetRemaining != null) addEvidence(`${money.format(breakdown.budgetRemaining)} under budget`);
+
+    let tradeoffs = null;
+    if (option.tradeoffs?.length) {
+      tradeoffs = document.createElement('ul');
+      tradeoffs.className = 'option-tradeoffs';
+      option.tradeoffs.forEach((tradeoff) => {
+        const item = document.createElement('li');
+        item.textContent = tradeoff;
+        tradeoffs.append(item);
+      });
+    }
 
     const price = document.createElement('div');
     price.className = 'option-price';
@@ -903,14 +1274,17 @@ function renderOptions() {
     const select = document.createElement('button');
     select.type = 'button';
     select.className = 'select-option';
-    select.textContent = 'Select option';
+    select.textContent = invalidated ? 'Refresh required' : 'Select option';
+    select.disabled = invalidated;
     select.addEventListener('click', () => withBusyButton(
       select,
       'Selecting…',
       () => selectSeatOption(option.optionId),
     ));
     actions.append(preview, select);
-    card.append(top, labels, reason, price, actions);
+    card.append(top, labels, reason, evidence);
+    if (tradeoffs) card.append(tradeoffs);
+    card.append(price, actions);
     container.append(card);
   });
 }
@@ -944,6 +1318,7 @@ function renderCart() {
   elements['checkout-button'].disabled = !activeHold;
   elements['hold-button'].textContent = activeHold ? 'Active hold' : 'Hold for 10 minutes';
   updateHoldClock();
+  updateJudgeControls();
 }
 
 function updateHoldClock() {
@@ -1035,6 +1410,8 @@ async function withBusyButton(button, busyText, action) {
   } finally {
     button.textContent = originalText;
     button.disabled = false;
+    if (state.cart) renderCart();
+    else updateJudgeControls();
   }
 }
 
@@ -1062,20 +1439,41 @@ function bindUi() {
 
   elements['seat-preferences-form'].addEventListener('submit', (event) => {
     event.preventDefault();
-    const budgetValue = elements['seat-budget'].value.trim();
-    withBusyButton(elements['find-seats-button'], 'Searching…', () => findSeatOptions({
-      eventId: state.details?.event.id,
-      quantity: Number(elements['seat-quantity'].value),
-      maxTotalBudget: budgetValue ? Number(budgetValue) : null,
-      zonePreference: elements['zone-preference'].value,
-      preference: elements['seat-priority'].value,
-    }));
+    withBusyButton(
+      elements['find-seats-button'],
+      'Searching…',
+      () => findSeatOptions(searchInputFromControls()),
+    );
   });
+
+  elements['accessible-pair'].addEventListener('change', () => {
+    if (elements['accessible-pair'].checked) {
+      elements['seat-priority'].value = 'accessible';
+      if (Number(elements['seat-quantity'].value) < 2) elements['seat-quantity'].value = '2';
+    }
+  });
+
+  elements['copy-judge-prompt'].addEventListener('click', () => void copyJudgePrompt());
+  elements['load-judge-scenario'].addEventListener('click', () => withBusyButton(
+    elements['load-judge-scenario'],
+    'Loading…',
+    () => loadJudgeScenario(),
+  ));
+  elements['simulate-competitor'].addEventListener('click', () => withBusyButton(
+    elements['simulate-competitor'],
+    'Changing availability…',
+    () => simulateCompetingBuyer(),
+  ));
+  elements['reset-judge-scenario'].addEventListener('click', () => withBusyButton(
+    elements['reset-judge-scenario'],
+    'Resetting…',
+    () => resetJudgeScenario(),
+  ));
 
   elements['hold-button'].addEventListener('click', () => withBusyButton(
     elements['hold-button'],
     'Holding…',
-    () => holdSelectedSeats(),
+    () => holdSelectedSeats('HOLD_SELECTED_SEATS'),
   ));
   elements['release-button'].addEventListener('click', () => withBusyButton(
     elements['release-button'],

@@ -1,35 +1,38 @@
 # WebMCP Challenge Compliance Checklist
 
-Last reviewed against the official rules on September 2, 2026.
+Last reviewed against the official rules and deadline-extension notice on September 3, 2026.
 
 Official sources:
 
 - [OpenAI WebMCP Challenge](https://openai.com/webmcp-challenge/)
 - [Devpost challenge page](https://webmcp.devpost.com/)
 - [Official rules](https://webmcp.devpost.com/rules)
+- [Official 12-hour deadline extension](https://webmcp.devpost.com/updates/46227-deadline-extension-12-more-hours)
 
 ## Critical deadline
 
-The submission deadline is **September 3, 2026 at 1:00 PM Pacific Time**. The judging period runs from September 4 at 10:00 AM PT through September 21 at 5:00 PM PT. The working project must remain available to judges, free of charge and without restrictions, through the end of judging.
+Devpost extended the submission deadline by 12 hours because of a service outage. The updated deadline displayed by the challenge and its official notice is **September 4, 2026 at 1:00 AM Pacific Time**. Treat that as a hard freeze: the submitted repository, video, description, and live experience must match. The working project must remain available to judges, free of charge and without restrictions, through the end of judging.
 
 ## Current status
 
 | Requirement | Status | Evidence or required action |
 |---|---|---|
 | WebMCP-powered web app | Ready | Nine tools are registered from the main page with `document.modelContext.registerTool()` |
-| Working, coherent product experience | Ready locally | Conversational concierge, recommendations, interactive map, cart, expiring holds, release, and simulated checkout work as one flow |
+| Working, coherent product experience | Ready locally | Judge Mode, explainable recommendations, live conflict recovery, interactive map, cart, expiring holds, release, and simulated checkout work as one flow |
 | Main document, no iframe | Ready | `index.html` loads the WebMCP module directly and contains no iframe |
 | Narrow JSON Schemas | Ready | All tools declare input schemas; object schemas reject undeclared properties |
-| Read-only and state-changing actions separated | Ready | Search/details/ranking/cart are read-only; highlight/select/hold/release/checkout are distinct actions |
-| Explicit confirmation for consequential checkout | Ready | `proceed_to_checkout` accepts only `SIMULATE_CHECKOUT`; guided chat asks for a separate confirmation phrase |
+| Read-only and state-changing actions separated | Ready | Search/details/ranking/cart are read-only; highlight is visual; select/hold/release/checkout are distinct consequential actions |
+| Explicit confirmation for consequential actions | Ready | `hold_seats` accepts only `HOLD_SELECTED_SEATS`; `proceed_to_checkout` accepts only `SIMULATE_CHECKOUT` |
+| Live availability recovery | Ready locally | Judge Mode creates a 90-second competing hold; stale actions return seat IDs and a recovery directive without automatic substitution |
+| Explainable real-world constraints | Ready locally | Fit evidence covers center offset, zone, aisle, accessible companion, budget, split layout, and orphan-seat impact |
 | English submission experience | Ready | Page, messages, tool descriptions, README, checklist, and submission draft are in English |
 | Fictional and isolated data | Ready | Only the `webmcp_demo` PostgreSQL schema is used; no real inventory, customer, payment, or ticket APIs |
-| Source, assets, and run instructions | Ready locally | Repository includes complete source, Docker setup, Windows/WSL/Linux steps, reset scripts, and health checks |
-| Open-source license | Ready locally | MIT `LICENSE` is present; verify the hosting site detects it in the repository About section |
-| New project or dated meaningful extension | Needs repository history | Create the initial commit before the deadline and preserve dated commits that show the WebMCP implementation |
-| Public source repository URL | **User action required** | Publish to GitHub, GitLab, or Bitbucket; confirm `.env` and tunnel credentials are absent before pushing |
-| Working public live URL | **User action required** | Start the Cloudflare Tunnel profile, configure HTTPS, and test from outside the home network in a compatible client |
-| Public YouTube demo under three minutes | **User action required** | Record with audio, demonstrate the working app and WebMCP, publish publicly, and add the URL to Devpost |
+| Source, assets, and run instructions | Ready | Public repository includes complete source, Docker setup, Windows/WSL/Linux steps, reset scripts, CI, and health checks |
+| Open-source license | Ready | Public GitHub repository includes the MIT `LICENSE`; verify the About section detects it |
+| New project or dated meaningful extension | Ready | Public dated commit history documents the WebMCP implementation and final resilience extension |
+| Public source repository URL | Ready | `https://github.com/henkidama/ticketnauta-ai-seat-concierge` |
+| Working public live URL | Redeploy required | Redeploy and verify `https://webmcp.ticketnauta.com/` after the final changes |
+| Public YouTube demo under three minutes | **Replacement required** | Re-record the new Live Seat Rescue flow with English audio, publish it publicly, and replace the prior URL in Devpost |
 | Devpost text description | Draft ready | Copy and adapt `SUBMISSION.md`; it directly answers all four required description points |
 | Devpost registration and final submission | **User action required** | Join the challenge, complete every required field, and submit before the deadline |
 | Availability through September 21 | **User action required** | Keep the server, database, internet connection, and Cloudflare Tunnel healthy through 5:00 PM PT |
@@ -42,14 +45,16 @@ Complete this after the public hostname is live:
 
 1. Open the HTTPS URL in the ChatGPT in-app browser.
 2. Verify the header reports `9 WebMCP tools active`.
-3. Ask an agent to search fictional events and inspect one event.
-4. Ask for four contiguous seats under a total budget and a preferred zone.
-5. Confirm the map highlights the returned seats and the conversation labels the call `WEBMCP`.
-6. Ask the agent to select and hold the option; verify the countdown appears.
-7. Read the cart summary, release the hold, and verify availability returns.
-8. Create another hold and complete only the simulated checkout with explicit confirmation.
-9. Repeat the essential flow in Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled.
-10. Test the URL from an external network and a clean browser session.
+3. Click **Load scenario** in Judge Mode and copy the English agent prompt.
+4. Let the agent rank and highlight an option, but ask before selecting or holding.
+5. Click **Simulate competing buyer**, approve the stale option, and verify `seat_conflict` appears visibly.
+6. Confirm the agent refreshes, explains a valid replacement, and requests renewed approval.
+7. Approve the replacement and verify `HOLD_SELECTED_SEATS` creates the countdown.
+8. Read the cart summary, release the hold, and verify availability returns.
+9. Confirm trace rows show `WEBMCP`, safety classification, input/result summary, and duration.
+10. Create another hold and complete only the simulated checkout with `SIMULATE_CHECKOUT`.
+11. Repeat the essential flow in Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled.
+12. Run `npm run smoke:rescue -- https://webmcp.ticketnauta.com` and test from an external clean session.
 
 ## Submission package check
 
@@ -66,7 +71,7 @@ Before pressing Submit, ensure Devpost contains:
 
 The official criteria are equally weighted:
 
-- **WebMCP Leverage:** nine focused tools cover discovery, decision support, visible page updates, and safe actions.
-- **Execution:** the demo is a complete user journey backed by PostgreSQL and Docker rather than a static mockup.
-- **Potential Impact:** the agent reduces the difficult multi-constraint seat search while the human keeps visual context and control.
-- **Creativity and Ambition:** the shared conversation timeline makes human-guided and browser-agent actions transparent on the same live seat map.
+- **WebMCP Leverage:** nine focused tools cover discovery, explainable optimization, visible page updates, safe actions, typed conflict feedback, and agent-led recovery.
+- **Execution:** the demo is a complete PostgreSQL-backed journey with a repeatable failure path, session reset, Docker, health checks, unit tests, and end-to-end CI.
+- **Potential Impact:** the agent handles real group, budget, aisle, accessibility, inventory-fragmentation, and concurrency constraints while the human retains consent.
+- **Creativity and Ambition:** Live Seat Rescue turns a static recommendation into resilient human-agent collaboration on the same changing seat map.

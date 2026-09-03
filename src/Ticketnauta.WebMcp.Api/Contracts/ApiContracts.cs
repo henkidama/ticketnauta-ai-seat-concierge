@@ -43,7 +43,11 @@ public sealed record FindSeatOptionsRequest(
     int Quantity,
     decimal? MaxTotalBudget,
     string? ZonePreference,
-    string? Preference);
+    string? Preference,
+    bool PreferAisle = false,
+    bool RequireAccessiblePair = false,
+    bool AllowSplitPairs = false,
+    bool AvoidOrphanSeats = true);
 
 public sealed record SeatCandidate(
     string Id,
@@ -67,7 +71,19 @@ public sealed record SeatOption(
     decimal PricePerSeat,
     decimal TotalPrice,
     string Reason,
-    double Score);
+    double Score,
+    string Layout,
+    int MatchScore,
+    SeatScoreBreakdown ScoreBreakdown,
+    IReadOnlyList<string> Tradeoffs);
+
+public sealed record SeatScoreBreakdown(
+    double CenterOffset,
+    bool PreferredZoneMatched,
+    bool IncludesAisle,
+    bool IncludesAccessibleCompanion,
+    bool LeavesOrphanSeat,
+    decimal? BudgetRemaining);
 
 public sealed record SelectSeatOptionRequest(
     string SessionId,
@@ -111,3 +127,18 @@ public sealed record CheckoutResult(
     string Message);
 
 public sealed record DemoResetRequest(string Confirmation);
+
+public sealed record DemoSessionResetRequest(string SessionId);
+
+public sealed record SimulateCompetingBuyerRequest(
+    string SessionId,
+    string EventId,
+    IReadOnlyList<string> SeatIds);
+
+public sealed record DemoDisruptionResult(
+    Guid HoldId,
+    string EventId,
+    IReadOnlyList<string> SeatIds,
+    IReadOnlyList<string> SeatLabels,
+    DateTimeOffset ExpiresAt,
+    string Message);

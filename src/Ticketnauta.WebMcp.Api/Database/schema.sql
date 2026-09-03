@@ -188,7 +188,8 @@ WITH seat_rows(row_label, row_index) AS (
         n AS seat_number,
         100 + ((n - 1) * 50) AS x,
         100 + ((z.sort_order - 1) * 205) + (r.row_index * 32) AS y,
-        r.row_label = 'E' AND n IN (1, 2, 11, 12) AS is_accessible,
+        -- Edge positions are accessible spaces; E2 and E11 remain standard companion seats.
+        r.row_label = 'E' AND n IN (1, 12) AS is_accessible,
         CASE
             WHEN z.event_id = 'neon-desert-2026' AND z.code = 'gold' AND r.row_label = 'C' AND n IN (1, 2, 7, 8) THEN true
             WHEN z.event_id = 'neon-desert-2026' AND z.code = 'preferred' AND r.row_label = 'B' AND n IN (3, 9) THEN true
