@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Ticketnauta AI Seat Concierge, an isolated WebMCP demo with fictional events and seats.">
+  <title>Ticketnauta AI Seat Concierge · WebMCP Demo</title>
+  <link rel="stylesheet" href="/styles.css?v=3">
+</head>
+<body>
+  <div class="page-glow page-glow-a" aria-hidden="true"></div>
+  <div class="page-glow page-glow-b" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Ticketnauta AI Seat Concierge">
+      <span class="brand-mark" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>
+      <span class="brand-copy">
+        <strong>ticketnauta</strong>
+        <small>AI Seat Concierge</small>
+      </span>
+    </a>
+
+    <div class="topbar-status">
+      <span class="demo-pill"><i></i> ISOLATED DEMO</span>
+      <span id="webmcp-status" class="mcp-pill pending" title="WebMCP tool status">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.3 3.8a3 3 0 0 1 4.2 0l7.7 7.7a3 3 0 0 1-4.2 4.2l-5.7-5.6a1.5 1.5 0 0 1 2.1-2.2l5.1 5.1a.7.7 0 1 0 1-1L13.4 7a3 3 0 0 0-4.2 4.2l5.6 5.7a4.5 4.5 0 0 0 6.4-6.4l-7.7-7.7a4.5 4.5 0 0 0-6.4 0L2.8 7a4.5 4.5 0 0 0 6.4 6.4l.5-.5-1.1-1.1-.5.5a3 3 0 0 1-4.2-4.2l4.4-4.3Z"/></svg>
+        <span>Preparing WebMCP</span>
+      </span>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <aside class="event-rail panel" aria-label="Demo events">
+      <div class="rail-heading">
+        <p class="eyebrow">FICTIONAL EXPERIENCES</p>
+        <h2>Choose an event</h2>
+      </div>
+
+      <form id="event-search-form" class="search-box" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20 20-4.4-4.4m2.4-5.1a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"/></svg>
+        <label class="sr-only" for="event-search">Search events</label>
+        <input id="event-search" name="query" type="search" placeholder="Search city or venue">
+      </form>
+
+      <div id="event-list" class="event-list" aria-live="polite"></div>
+
+      <div class="rail-note">
+        <span class="note-icon" aria-hidden="true">i</span>
+        <p><strong>Demo environment.</strong> Every event, price, seat, and checkout is fictional.</p>
+      </div>
+    </aside>
+
+    <section class="workspace" aria-label="Seat map and search">
+      <article class="event-hero panel">
+        <div class="hero-main">
+          <div class="hero-labels">
+            <span class="live-dot"><i></i> LIVE DEMO AVAILABILITY</span>
+            <span id="hero-city" class="quiet-pill">—</span>
+          </div>
+          <h1 id="hero-title">Loading experience…</h1>
+          <p id="hero-tagline">Preparing the intelligent seat map.</p>
+          <div id="hero-meta" class="hero-meta"></div>
+        </div>
+        <div class="hero-orbit" aria-hidden="true">
+          <div class="orbit orbit-a"></div>
+          <div class="orbit orbit-b"></div>
+          <div class="hero-spark">✦</div>
+        </div>
+      </article>
+
+      <form id="seat-preferences-form" class="preference-bar panel">
+        <div class="preference-copy">
+          <span class="ai-glyph" aria-hidden="true">✦</span>
+          <div>
+            <p class="eyebrow">AI CONCIERGE</p>
+            <strong>Find your best seat combination</strong>
+          </div>
+        </div>
+
+        <label class="field compact-field">
+          <span>Guests</span>
+          <select id="seat-quantity" name="quantity">
+            <option value="1">1 seat</option>
+            <option value="2" selected>2 seats</option>
+            <option value="3">3 seats</option>
+            <option value="4">4 seats</option>
+            <option value="5">5 seats</option>
+            <option value="6">6 seats</option>
+            <option value="7">7 seats</option>
+            <option value="8">8 seats</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Total budget</span>
+          <div class="money-input"><b>$</b><input id="seat-budget" name="budget" type="number" min="100" step="100" value="5000" inputmode="decimal"></div>
+        </label>
+
+        <label class="field">
+          <span>Preferred zone</span>
+          <select id="zone-preference" name="zone">
+            <option value="any">Any zone</option>
+            <option value="diamond">Diamond</option>
+            <option value="gold">Gold</option>
+            <option value="preferred">Preferred</option>
+            <option value="general">General Admission</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Priority</span>
+          <select id="seat-priority" name="preference">
+            <option value="center">Most centered</option>
+            <option value="closest_to_stage">Closest to stage</option>
+            <option value="best_value">Best value</option>
+            <option value="accessible">Accessibility</option>
+            <option value="any">Any</option>
+          </select>
+        </label>
+
+        <button id="find-seats-button" class="primary-button find-button" type="submit">
+          <span class="button-spark" aria-hidden="true">✦</span>
+          Find with AI
+        </button>
+      </form>
+
+      <article class="map-card panel">
+        <div class="card-heading map-heading">
+          <div>
+            <p class="eyebrow">INTERACTIVE MAP</p>
+            <h2 id="map-title">Choose your seats</h2>
+          </div>
+          <div class="map-legend" aria-label="Seat map legend">
+            <span><i class="legend-seat available"></i>Available</span>
+            <span><i class="legend-seat selected"></i>Selected</span>
+            <span><i class="legend-seat held"></i>Held</span>
+            <span><i class="legend-seat unavailable"></i>Unavailable</span>
+          </div>
+        </div>
+
+        <div id="zone-chips" class="zone-chips" aria-label="Prices by zone"></div>
+
+        <div id="seat-map-wrapper" class="seat-map-wrapper" tabindex="-1">
+          <div id="map-loading" class="map-loading"><span></span>Preparing map…</div>
+          <svg id="seat-map" viewBox="0 0 760 920" role="group" aria-label="Interactive seat map"></svg>
+        </div>
+
+        <div class="map-footer">
+          <p><span aria-hidden="true">♿</span> Accessible seats display an additional ring.</p>
+          <p id="map-availability">— seats available</p>
+        </div>
+      </article>
+    </section>
+
+    <aside class="concierge-rail" aria-label="AI concierge, recommendations, and cart">
+      <article class="conversation-card panel">
+        <div class="card-heading conversation-heading">
+          <div>
+            <p class="eyebrow">HUMAN + AGENT</p>
+            <h2>Concierge conversation</h2>
+          </div>
+          <span class="conversation-live"><i></i> LIVE</span>
+        </div>
+
+        <div id="conversation-feed" class="conversation-feed" role="log" aria-live="polite" aria-label="Concierge conversation and tool activity">
+          <article class="conversation-message assistant">
+            <span class="message-avatar" aria-hidden="true">✦</span>
+            <div>
+              <strong>AI Seat Concierge</strong>
+              <p>Tell me how many seats you need, your total budget, and what matters most. I will keep every step visible on the map.</p>
+            </div>
+          </article>
+        </div>
+
+        <div class="prompt-chips" aria-label="Suggested concierge requests">
+          <button type="button" data-concierge-prompt="Find 4 seats under MX$7,000 and hold the best option" disabled>4 seats + hold</button>
+          <button type="button" data-concierge-prompt="Show me 2 accessible seats" disabled>Accessible pair</button>
+          <button type="button" data-concierge-prompt="Find the closest Gold seats for 3 guests" disabled>Closest Gold</button>
+        </div>
+
+        <form id="concierge-form" class="concierge-form">
+          <label class="sr-only" for="concierge-input">Ask the demo concierge</label>
+          <input id="concierge-input" type="text" maxlength="180" autocomplete="off" placeholder="Preparing the concierge…" disabled>
+          <button id="concierge-send" type="submit" aria-label="Send concierge request" disabled>↑</button>
+        </form>
+
+        <p class="conversation-note"><span id="activity-count">0</span> visible tool actions · guided requests and browser-agent calls are labeled separately</p>
+      </article>
+
+      <article class="recommendations panel">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">RECOMMENDATIONS</p>
+            <h2>Best options</h2>
+          </div>
+          <span id="options-count" class="count-badge">0</span>
+        </div>
+        <div id="options-empty" class="empty-state">
+          <span class="empty-spark" aria-hidden="true">✦</span>
+          <strong>Your concierge is ready</strong>
+          <p>Set guest count, budget, and priority to find contiguous seat blocks.</p>
+        </div>
+        <div id="seat-options" class="seat-options" aria-live="polite"></div>
+      </article>
+
+      <article class="cart-card panel">
+        <div class="card-heading cart-heading">
+          <div>
+            <p class="eyebrow">YOUR SELECTION</p>
+            <h2>Summary</h2>
+          </div>
+          <span id="hold-badge" class="hold-badge hidden"><i></i><span>10:00</span></span>
+        </div>
+
+        <div id="cart-empty" class="cart-empty">You have not selected any seats yet.</div>
+        <div id="cart-content" class="cart-content hidden">
+          <div id="cart-event" class="cart-event"></div>
+          <div id="cart-seats" class="cart-seats"></div>
+          <div class="cart-total"><span>Demo total</span><strong id="cart-total">$0</strong></div>
+          <p class="fee-note">No fees, charges, or real payment.</p>
+        </div>
+
+        <div class="cart-actions">
+          <button id="hold-button" class="primary-button" type="button" disabled>Hold for 10 minutes</button>
+          <button id="checkout-button" class="checkout-button" type="button" disabled>Continue to demo checkout</button>
+          <button id="release-button" class="text-button hidden" type="button">Release seats</button>
+        </div>
+      </article>
+
+    </aside>
+  </main>
+
+  <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
+
+  <dialog id="receipt-dialog" class="receipt-dialog">
+    <div class="receipt-mark" aria-hidden="true">✓</div>
+    <p class="eyebrow">SIMULATED CHECKOUT</p>
+    <h2>Demo complete!</h2>
+    <p id="receipt-message"></p>
+    <dl>
+      <div><dt>Reference</dt><dd id="receipt-reference"></dd></div>
+      <div><dt>Fictional total</dt><dd id="receipt-total"></dd></div>
+    </dl>
+    <form method="dialog"><button class="primary-button" value="close">Back to the map</button></form>
+  </dialog>
+
+  <script type="module" src="/app.js?v=4"></script>
+</body>
+</html>

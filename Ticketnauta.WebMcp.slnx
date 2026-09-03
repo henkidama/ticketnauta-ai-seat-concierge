@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Ticketnauta.WebMcp.Api/Ticketnauta.WebMcp.Api.csproj" />
+  <Project Path="tests/Ticketnauta.WebMcp.Tests/Ticketnauta.WebMcp.Tests.csproj" />
+</Solution>

@@ -1,0 +1,27 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# .NET
+**/bin/
+**/obj/
+TestResults/
+*.user
+*.suo
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Runtime data
+data/
+*.log
+
+# Local analysis artifacts
+.graphify_*.json
+.graphify_*.txt
+graphify-out/

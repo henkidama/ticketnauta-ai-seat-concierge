@@ -1,0 +1,68 @@
+name: ticketnauta-webmcp
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ticketnauta-webmcp:local
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8085}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: 8080
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__DemoDatabase: "Host=${DB_HOST:?Set DB_HOST in .env};Port=${DB_PORT:-5432};Database=${DB_NAME:?Set DB_NAME in .env};Username=${DB_USER:?Set DB_USER in .env};Password=${DB_PASSWORD:?Set DB_PASSWORD in .env};SSL Mode=${DB_SSL_MODE:-Prefer};Timeout=10;Command Timeout=30;Pooling=true"
+      Demo__HoldMinutes: "${HOLD_MINUTES:-10}"
+      Demo__AdminToken: "${DEMO_ADMIN_TOKEN:?Set DEMO_ADMIN_TOKEN in .env}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "dotnet", "Ticketnauta.WebMcp.Api.dll", "--health-check"]
+      interval: 15s
+      timeout: 5s
+      start_period: 35s
+      retries: 4
+    networks:
+      - webmcp
+
+  db:
+    profiles: ["localdb"]
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${DB_NAME:?Set DB_NAME in .env}"
+      POSTGRES_USER: "${DB_USER:?Set DB_USER in .env}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env}"
+    ports:
+      - "${LOCAL_POSTGRES_PORT:-5435}:5432"
+    volumes:
+      - demo-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - webmcp
+
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN:-}"
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - webmcp
+
+volumes:
+  demo-postgres:
+
+networks:
+  webmcp:
+    driver: bridge

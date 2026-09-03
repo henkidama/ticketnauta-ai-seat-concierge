@@ -1,0 +1,12 @@
+{
+  "name": "ticketnauta-webmcp-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:web": "node --check src/Ticketnauta.WebMcp.Api/wwwroot/app.js && node --check src/Ticketnauta.WebMcp.Api/wwwroot/webmcp.js && node scripts/check-webmcp.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
