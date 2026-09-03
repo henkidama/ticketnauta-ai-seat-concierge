@@ -18,20 +18,20 @@ Devpost extended the submission deadline by 12 hours because of a service outage
 | Requirement | Status | Evidence or required action |
 |---|---|---|
 | WebMCP-powered web app | Ready | Nine tools are registered from the main page with `document.modelContext.registerTool()` |
-| Working, coherent product experience | Ready locally | Judge Mode, explainable recommendations, live conflict recovery, interactive map, cart, expiring holds, release, and simulated checkout work as one flow |
+| Working, coherent product experience | Verified publicly | Judge Mode, explainable recommendations, live conflict recovery, interactive map, cart, expiring holds, release, and simulated checkout work as one flow at the public HTTPS URL |
 | Main document, no iframe | Ready | `index.html` loads the WebMCP module directly and contains no iframe |
 | Narrow JSON Schemas | Ready | All tools declare input schemas; object schemas reject undeclared properties |
 | Read-only and state-changing actions separated | Ready | Search/details/ranking/cart are read-only; highlight is visual; select/hold/release/checkout are distinct consequential actions |
 | Explicit confirmation for consequential actions | Ready | `hold_seats` accepts only `HOLD_SELECTED_SEATS`; `proceed_to_checkout` accepts only `SIMULATE_CHECKOUT` |
-| Live availability recovery | Ready locally | Judge Mode creates a 90-second competing hold; stale actions return seat IDs and a recovery directive without automatic substitution |
-| Explainable real-world constraints | Ready locally | Fit evidence covers center offset, zone, aisle, accessible companion, budget, split layout, and orphan-seat impact |
+| Live availability recovery | Verified publicly | The public smoke test confirms a 90-second competing hold, typed `seat_conflict`, refreshed alternatives, a replacement hold, and release without automatic substitution |
+| Explainable real-world constraints | Verified publicly | The public Judge Mode displays fit evidence for center offset, zone, aisle, accessible companion, budget, split layout, and orphan-seat impact |
 | English submission experience | Ready | Page, messages, tool descriptions, README, checklist, and submission draft are in English |
 | Fictional and isolated data | Ready | Only the `webmcp_demo` PostgreSQL schema is used; no real inventory, customer, payment, or ticket APIs |
 | Source, assets, and run instructions | Ready | Public repository includes complete source, Docker setup, Windows/WSL/Linux steps, reset scripts, CI, and health checks |
 | Open-source license | Ready | Public GitHub repository includes the MIT `LICENSE`; verify the About section detects it |
 | New project or dated meaningful extension | Ready | Public dated commit history documents the WebMCP implementation and final resilience extension |
 | Public source repository URL | Ready | `https://github.com/henkidama/ticketnauta-ai-seat-concierge` |
-| Working public live URL | Redeploy required | Redeploy and verify `https://webmcp.ticketnauta.com/` after the final changes |
+| Working public live URL | Verified publicly | `https://webmcp.ticketnauta.com/` serves the final commit, passes readiness checks, registers nine WebMCP tools, and passes `smoke:rescue` |
 | Public YouTube demo under three minutes | **Replacement required** | Re-record the new Live Seat Rescue flow with English audio, publish it publicly, and replace the prior URL in Devpost |
 | Devpost text description | Draft ready | Copy and adapt `SUBMISSION.md`; it directly answers all four required description points |
 | Devpost registration and final submission | **User action required** | Join the challenge, complete every required field, and submit before the deadline |
