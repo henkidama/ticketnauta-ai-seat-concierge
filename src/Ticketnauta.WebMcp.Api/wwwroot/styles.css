@@ -638,6 +638,7 @@ h2 {
 
 .primary-button,
 .checkout-button,
+.release-button,
 .text-button {
   min-height: 40px;
   border-radius: 11px;
@@ -659,7 +660,8 @@ h2 {
 }
 
 .primary-button:disabled,
-.checkout-button:disabled {
+.checkout-button:disabled,
+.release-button:disabled {
   cursor: not-allowed;
   filter: grayscale(0.35);
   opacity: 0.38;
@@ -1543,6 +1545,18 @@ h2 {
 .checkout-button:hover:not(:disabled) {
   border-color: rgba(54, 221, 189, 0.45);
   background: rgba(54, 221, 189, 0.15);
+}
+
+.release-button {
+  border: 1px solid rgba(255, 132, 143, 0.32);
+  background: rgba(255, 99, 114, 0.1);
+  color: #ffb4bb;
+}
+
+.release-button:hover:not(:disabled) {
+  border-color: rgba(255, 132, 143, 0.58);
+  background: rgba(255, 99, 114, 0.17);
+  color: #ffd4d8;
 }
 
 .text-button {

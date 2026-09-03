@@ -809,6 +809,15 @@ async function releaseSeats(signal) {
   return state.cart;
 }
 
+async function releaseHoldFromUi() {
+  const cart = await runGuidedTool('release_seats', {}, () => releaseSeats());
+  appendConversationMessage(
+    'assistant',
+    `Your demo hold was released immediately and the seats are available again. ${cartSummary(cart)}`,
+  );
+  return cart;
+}
+
 async function getCartSummary(signal) {
   state.cart = await apiFetch(`/api/cart/${encodeURIComponent(state.sessionId)}`, { signal });
   syncSelectedFromCart();
@@ -1478,7 +1487,7 @@ function bindUi() {
   elements['release-button'].addEventListener('click', () => withBusyButton(
     elements['release-button'],
     'Releasing…',
-    () => releaseSeats(),
+    () => releaseHoldFromUi(),
   ));
   elements['checkout-button'].addEventListener('click', async () => {
     const confirmed = window.confirm('This checkout changes demo data only and never makes a real charge. Continue?');

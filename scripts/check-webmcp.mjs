@@ -35,6 +35,11 @@ assert.match(page, /id="conversation-feed"/, 'Visible tool activity must be pres
 assert.match(page, /id="load-judge-scenario"/, 'Judge Mode must expose a repeatable scenario launcher.');
 assert.match(page, /id="simulate-competitor"/, 'Live Seat Rescue must expose the competing-buyer control.');
 assert.match(page, /id="accessible-pair"/, 'The UI must expose accessible companion seating.');
+assert.match(
+  page,
+  /id="release-button" class="release-button hidden"[^>]*>Release hold now<\/button>/,
+  'An active demo hold must expose a prominent manual release action.',
+);
 assert.equal(
   (page.match(/data-concierge-prompt="[^"]+" disabled/g) ?? []).length,
   3,
@@ -47,9 +52,10 @@ assert.match(app, /source:\s*'WEBMCP'/, 'Browser-agent actions must be labeled s
 assert.match(app, /source:\s*'GUIDED'/, 'Guided chat actions must be labeled separately.');
 assert.match(app, /class DemoApiError/, 'Structured API errors must remain available to WebMCP tools.');
 assert.match(app, /error\?\.code !== 'seat_conflict'/, 'The guided experience must recover from seat conflicts.');
+assert.match(app, /async function releaseHoldFromUi\(\)/, 'The manual release action must be visible in the guided activity trace.');
 assert.match(app, /\/api\/demo\/competing-hold/, 'Judge Mode must exercise a real backend availability change.');
 assert.match(app, /state\.conciergeReady = true/, 'The concierge must enable only after initial data is ready.');
 assert.match(app, /crypto\?\.getRandomValues/, 'The main page needs an HTTP LAN-safe UUID fallback.');
 assert.match(webMcp, /crypto\?\.getRandomValues/, 'WebMCP activity IDs need an HTTP LAN-safe UUID fallback.');
 
-console.log('WebMCP contract check passed: 9 narrow tools, English Judge Mode, structured recovery, visible traces, and explicit hold/checkout confirmation.');
+console.log('WebMCP contract check passed: 9 narrow tools, English Judge Mode, structured recovery, visible traces, prominent hold release, and explicit hold/checkout confirmation.');
